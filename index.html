@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>樹冠疎密度・簡易測定</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f4f8;
+            color: #333;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.2rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        /* ファイル選択ボタンのデザイン */
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .btn {
+            border: 2px solid gray;
+            color: gray;
+            background-color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        /* キャンバス（画像表示エリア） */
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+
+        /* コントロールエリア */
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #eef;
+            border-radius: 8px;
+        }
+        input[type=range] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        /* 結果表示 */
+        .result-box {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .score {
+            font-size: 1.5rem;
+            color: #27ae60;
+        }
+        .sub-score {
+            font-size: 1rem;
+            color: #7f8c8d;
+        }
+        .legend {
+            font-size: 0.8rem;
+            color: #e74c3c;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌲 樹冠疎密度チェッカー</h1>
+
+    <div class="upload-btn-wrapper">
+        <button class="btn">📷 写真を撮影・選択</button>
+        <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="controls" id="controlPanel" style="display:none;">
+        <label>判定の調整（空の明るさ）</label>
+        <input type="range" id="thresholdSlider" min="0" max="255" value="180">
+        <div class="legend">※赤色の部分を「空」として計算しています</div>
+        
+        <div class="result-box">
+            <div>
+                <div>樹冠被覆率</div>
+                <div class="score" id="treeRatio">0%</div>
+            </div>
+            <div>
+                <div>空隙率（空）</div>
+                <div class="sub-score" id="skyRatio">0%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('thresholdSlider');
+    const controlPanel = document.getElementById('controlPanel');
+    const treeRatioDisplay = document.getElementById('treeRatio');
+    const skyRatioDisplay = document.getElementById('skyRatio');
+
+    let originalImageData = null; // 元画像のデータを保持
+    const MAX_WIDTH = 800; // 処理を軽くするためにリサイズする幅
+
+    // 1. 画像が選択されたら読み込む
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // 画像サイズを調整してキャンバスに描画
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height = height * (MAX_WIDTH / width);
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // 元のピクセルデータを取得して保存（計算用）
+                originalImageData = ctx.getImageData(0, 0, width, height);
+                
+                // コントロールを表示して初期計算
+                controlPanel.style.display = 'block';
+                processImage();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // 2. スライダーを動かした時に計算する
+    slider.addEventListener('input', processImage);
+
+    // 3. 画像処理のメインロジック
+    function processImage() {
+        if (!originalImageData) return;
+
+        const threshold = parseInt(slider.value); // スライダーの値 (0-255)
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // 元データから新しい描画用データを作成
+        const displayData = ctx.createImageData(width, height);
+        const src = originalImageData.data;
+        const dst = displayData.data;
+
+        let skyPixels = 0;
+        let totalPixels = width * height;
+
+        // 全ピクセルを走査
+        for (let i = 0; i < src.length; i += 4) {
+            const r = src[i];
+            const g = src[i + 1];
+            const b = src[i + 2];
+            
+            // 輝度（明るさ）を計算（一般的な計算式）
+            // 明るい＝空、暗い＝枝葉
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+
+            if (luminance > threshold) {
+                // 【空】と判定された場合
+                skyPixels++;
+                // 赤色で塗りつぶして表示 (R=255, G=0, B=0, A=255)
+                dst[i] = 255;     // R
+                dst[i+1] = 0;     // G
+                dst[i+2] = 0;     // B
+                dst[i+3] = 255;   // Alpha
+            } else {
+                // 【樹木】と判定された場合
+                // 元の色をそのまま表示
+                dst[i] = r;
+                dst[i+1] = g;
+                dst[i+2] = b;
+                dst[i+3] = 255;
+            }
+        }
+
+        // キャンバスに結果を描画
+        ctx.putImageData(displayData, 0, 0);
+
+        // 割合を計算して表示
+        const skyRatio = (skyPixels / totalPixels) * 100;
+        const treeRatio = 100 - skyRatio;
+
+        treeRatioDisplay.textContent = treeRatio.toFixed(1) + '%';
+        skyRatioDisplay.textContent = skyRatio.toFixed(1) + '%';
+    }
+</script>
+
+</body>
+</html>
