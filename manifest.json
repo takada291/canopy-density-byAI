@@ -1,6 +1,6 @@
 {
-  "name": "樹冠疎密ツール",
-  "short_name": "樹冠疎密",
+  "name": "AI林冠ツール",
+  "short_name": "AI林冠",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f0f2f5",
@@ -22,3 +22,4 @@
   ]
 
 }
+
