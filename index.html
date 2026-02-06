@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI林冠</title>
-
+    
     <link rel="manifest" href="manifest.json">
-
     <link rel="apple-touch-icon" href="icon-192.png">
-
     <meta name="theme-color" content="#f0f4f8">
 
     <style>
@@ -19,11 +17,13 @@
             background-color: #f0f4f8;
             color: #333;
             text-align: center;
+            /* スクロール時のバウンス防止（アプリっぽくする） */
+            overscroll-behavior-y: none; 
         }
         h1 {
             font-size: 1.2rem;
             color: #2c3e50;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         .container {
             max-width: 600px;
@@ -33,7 +33,87 @@
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        /* ファイル選択ボタンのデザイン */
+
+        /* --- 水準器エリアのデザイン --- */
+        .level-area {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 20px auto;
+            background-color: #eef;
+            border-radius: 50%;
+            border: 4px solid #bdc3c7;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* 中心ターゲット */
+        .crosshair {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        .crosshair::before, .crosshair::after {
+            content: '';
+            position: absolute;
+            background-color: #bdc3c7;
+        }
+        .crosshair::before { top: 50%; left: 10px; right: 10px; height: 1px; } /* 横線 */
+        .crosshair::after { left: 50%; top: 10px; bottom: 10px; width: 1px; } /* 縦線 */
+        .center-circle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #27ae60;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+        }
+        /* 動く気泡（赤い玉） */
+        .bubble {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background-color: #e74c3c;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* 初期位置は中心 */
+            transition: transform 0.1s ease-out; /* 滑らかに動かす */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 2;
+            opacity: 0.8;
+        }
+        /* 水平合致時のスタイル */
+        .level-area.perfect {
+            border-color: #27ae60;
+            background-color: #e8f8f5;
+        }
+        .level-msg {
+            font-size: 0.9rem;
+            height: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+
+        /* --- センサー許可ボタン（iOS用） --- */
+        .sensor-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            cursor: pointer;
+            display: none; /* 初期状態は非表示（JSで判定して表示） */
+        }
+
+        /* --- ファイル選択ボタン --- */
         .upload-btn-wrapper {
             position: relative;
             overflow: hidden;
@@ -41,14 +121,17 @@
             margin-bottom: 20px;
         }
         .btn {
-            border: 2px solid gray;
-            color: gray;
+            border: 2px solid #7f8c8d;
+            color: #555;
             background-color: white;
-            padding: 8px 20px;
+            padding: 10px 24px;
             border-radius: 8px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .upload-btn-wrapper input[type=file] {
             font-size: 100px;
@@ -59,12 +142,13 @@
             cursor: pointer;
         }
         
-        /* キャンバス（画像表示エリア） */
+        /* キャンバス */
         canvas {
             max-width: 100%;
             height: auto;
             border: 1px solid #ccc;
             margin-bottom: 15px;
+            display: none; /* 初期は非表示 */
         }
 
         /* コントロールエリア */
@@ -73,6 +157,7 @@
             padding: 15px;
             background-color: #eef;
             border-radius: 8px;
+            display: none; /* 初期は非表示 */
         }
         input[type=range] {
             width: 100%;
@@ -86,34 +171,36 @@
             margin-top: 15px;
             font-weight: bold;
         }
-        .score {
-            font-size: 1.5rem;
-            color: #27ae60;
-        }
-        .sub-score {
-            font-size: 1rem;
-            color: #7f8c8d;
-        }
-        .legend {
-            font-size: 0.8rem;
-            color: #e74c3c;
-            margin-top: 5px;
-        }
+        .score { font-size: 1.5rem; color: #27ae60; }
+        .sub-score { font-size: 1rem; color: #7f8c8d; }
+        .legend { font-size: 0.8rem; color: #e74c3c; margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🌲 AI林冠 v1.0</h1>
+    <h1>🌲 AI林冠 v1.1</h1>
+
+    <button id="sensorBtn" class="sensor-btn" onclick="requestSensorPermission()">📡 水準器を有効にする</button>
+
+    <div class="level-msg" id="levelMsg">スマホを水平にしてください</div>
+
+    <div class="level-area" id="levelArea">
+        <div class="crosshair"></div>
+        <div class="center-circle"></div>
+        <div class="bubble" id="bubble"></div>
+    </div>
 
     <div class="upload-btn-wrapper">
-        <button class="btn">📷 写真を撮影・選択</button>
-        <input type="file" id="fileInput" accept="image/*">
+        <button class="btn">
+            <span>📷</span> 写真を撮影・解析
+        </button>
+        <input type="file" id="fileInput" accept="image/*" capture="environment">
     </div>
 
     <canvas id="canvas"></canvas>
 
-    <div class="controls" id="controlPanel" style="display:none;">
+    <div class="controls" id="controlPanel">
         <label>判定の調整（空の明るさ）</label>
         <input type="range" id="thresholdSlider" min="0" max="255" value="180">
         <div class="legend">※赤色の部分を「空」として計算しています</div>
@@ -121,28 +208,105 @@
         <div class="result-box">
             <div>
                 <div>林冠被覆率</div>
-                <div class="score" id="treeRatio">0%</div>
+                <div class="score" id="treeRatio">-</div>
             </div>
             <div>
                 <div>空隙率（空）</div>
-                <div class="sub-score" id="skyRatio">0%</div>
+                <div class="sub-score" id="skyRatio">-</div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // ▼▼▼ サービスワーカーの登録処理（ここも必須です！） ▼▼▼
+    // --- サービスワーカー登録 ---
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
             navigator.serviceWorker.register('sw.js').then(function(registration) {
-                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                console.log('SW registered');
             }, function(err) {
-                console.log('ServiceWorker registration failed: ', err);
+                console.log('SW failed: ', err);
             });
         });
     }
-    // ▲▲▲ 追加終わり ▲▲▲
+
+    // --- 変数定義 ---
+    const bubble = document.getElementById('bubble');
+    const levelArea = document.getElementById('levelArea');
+    const levelMsg = document.getElementById('levelMsg');
+    const sensorBtn = document.getElementById('sensorBtn');
+    
+    // --- 1. 水準器（ジャイロセンサー）機能 ---
+    
+    // iOS 13以上かどうか判定してボタンを表示
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        sensorBtn.style.display = 'inline-block';
+        levelMsg.textContent = 'ボタンを押してセンサーを有効化';
+    } else {
+        // Androidなどは許可不要で動くことが多いのでそのまま開始
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
+
+    // iOS用の許可リクエスト処理
+    function requestSensorPermission() {
+        DeviceOrientationEvent.requestPermission()
+            .then(response => {
+                if (response === 'granted') {
+                    sensorBtn.style.display = 'none';
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    levelMsg.textContent = 'スマホを水平にしてください';
+                } else {
+                    alert('センサーの使用が拒否されました。設定を確認してください。');
+                }
+            })
+            .catch(console.error);
+    }
+
+    // 傾きの処理ロジック
+    function handleOrientation(event) {
+        // beta: 前後の傾き (-180 ~ 180)
+        // gamma: 左右の傾き (-90 ~ 90)
+        let x = event.gamma; // 左右
+        let y = event.beta;  // 前後
+
+        // スマホを垂直に持った状態などを考慮して制限
+        if (x > 90) x = 90;
+        if (x < -90) x = -90;
+        if (y > 90) y = 90;
+        if (y < -90) y = -90;
+
+        // 表示エリアの半径 (px)
+        const maxDist = 60; 
+
+        // 傾きをピクセル移動量に変換（感度調整）
+        // 1度傾くと2px動くくらいの設定
+        let moveX = x * 2;
+        let moveY = y * 2;
+
+        // エリア外に出ないように制限（円の中に収める）
+        const dist = Math.sqrt(moveX*moveX + moveY*moveY);
+        if (dist > maxDist) {
+            moveX = (moveX / dist) * maxDist;
+            moveY = (moveY / dist) * maxDist;
+        }
+
+        // 赤玉を移動
+        bubble.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+
+        // 判定：ほぼ水平なら枠を緑色にする
+        if (Math.abs(x) < 3 && Math.abs(y) < 3) {
+            levelArea.classList.add('perfect');
+            levelMsg.textContent = 'OK！ 真上を向いています';
+            levelMsg.style.color = '#27ae60';
+        } else {
+            levelArea.classList.remove('perfect');
+            levelMsg.textContent = '水平に合わせてください';
+            levelMsg.style.color = '#7f8c8d';
+        }
+    }
+
+
+    // --- 2. 画像処理機能（前回のコードを継承） ---
 
     const fileInput = document.getElementById('fileInput');
     const canvas = document.getElementById('canvas');
@@ -152,10 +316,9 @@
     const treeRatioDisplay = document.getElementById('treeRatio');
     const skyRatioDisplay = document.getElementById('skyRatio');
 
-    let originalImageData = null; // 元画像のデータを保持
-    const MAX_WIDTH = 800; // 処理を軽くするためにリサイズする幅
+    let originalImageData = null;
+    const MAX_WIDTH = 800;
 
-    // 1. 画像が選択されたら読み込む
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -164,7 +327,6 @@
         reader.onload = (event) => {
             const img = new Image();
             img.onload = () => {
-                // 画像サイズを調整してキャンバスに描画
                 let width = img.width;
                 let height = img.height;
 
@@ -176,12 +338,16 @@
                 canvas.width = width;
                 canvas.height = height;
                 ctx.drawImage(img, 0, 0, width, height);
-
-                // 元のピクセルデータを取得して保存（計算用）
-                originalImageData = ctx.getImageData(0, 0, width, height);
                 
-                // コントロールを表示して初期計算
+                // キャンバスを表示
+                canvas.style.display = 'block';
+
+                originalImageData = ctx.getImageData(0, 0, width, height);
                 controlPanel.style.display = 'block';
+                
+                // 画像読み込み時はスライダー位置までスクロール
+                controlPanel.scrollIntoView({behavior: "smooth"});
+                
                 processImage();
             };
             img.src = event.target.result;
@@ -189,18 +355,15 @@
         reader.readAsDataURL(file);
     });
 
-    // 2. スライダーを動かした時に計算する
     slider.addEventListener('input', processImage);
 
-    // 3. 画像処理のメインロジック
     function processImage() {
         if (!originalImageData) return;
 
-        const threshold = parseInt(slider.value); // スライダーの値 (0-255)
+        const threshold = parseInt(slider.value);
         const width = canvas.width;
         const height = canvas.height;
         
-        // 元データから新しい描画用データを作成
         const displayData = ctx.createImageData(width, height);
         const src = originalImageData.data;
         const dst = displayData.data;
@@ -208,38 +371,23 @@
         let skyPixels = 0;
         let totalPixels = width * height;
 
-        // 全ピクセルを走査
         for (let i = 0; i < src.length; i += 4) {
             const r = src[i];
             const g = src[i + 1];
             const b = src[i + 2];
             
-            // 輝度（明るさ）を計算（一般的な計算式）
-            // 明るい＝空、暗い＝枝葉
             const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
 
             if (luminance > threshold) {
-                // 【空】と判定された場合
                 skyPixels++;
-                // 赤色で塗りつぶして表示 (R=255, G=0, B=0, A=255)
-                dst[i] = 255;     // R
-                dst[i+1] = 0;     // G
-                dst[i+2] = 0;     // B
-                dst[i+3] = 255;   // Alpha
+                dst[i] = 255; dst[i+1] = 0; dst[i+2] = 0; dst[i+3] = 255;
             } else {
-                // 【樹木】と判定された場合
-                // 元の色をそのまま表示
-                dst[i] = r;
-                dst[i+1] = g;
-                dst[i+2] = b;
-                dst[i+3] = 255;
+                dst[i] = r; dst[i+1] = g; dst[i+2] = b; dst[i+3] = 255;
             }
         }
 
-        // キャンバスに結果を描画
         ctx.putImageData(displayData, 0, 0);
 
-        // 割合を計算して表示
         const skyRatio = (skyPixels / totalPixels) * 100;
         const treeRatio = 100 - skyRatio;
 
