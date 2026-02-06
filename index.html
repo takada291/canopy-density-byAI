@@ -14,15 +14,62 @@
             font-family: sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #000; /* カメラ画面っぽく黒背景 */
+            background-color: #000;
             color: #fff;
-            overflow: hidden; /* スクロール禁止 */
+            overflow: hidden;
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        /* --- メイン画面（カメラ＆水準器） --- */
+        /* --- スタート画面 --- */
+        #startScreen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f0f4f8;
+            color: #333;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .app-title {
+            font-size: 2rem;
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-weight: bold;
+        }
+        .mode-btn {
+            width: 250px;
+            padding: 20px;
+            margin: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn-camera {
+            background-color: #27ae60;
+            color: white;
+        }
+        .btn-file {
+            background-color: #3498db;
+            color: white;
+        }
+        .mode-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* --- カメラ画面 --- */
         .camera-container {
             position: relative;
             flex: 1;
@@ -30,89 +77,63 @@
             justify-content: center;
             align-items: center;
             overflow: hidden;
+            background: #000;
+            display: none; /* 初期は非表示 */
         }
-
-        /* カメラ映像（ビデオ） */
         #video {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* 画面いっぱいに表示 */
+            object-fit: cover;
             z-index: 1;
         }
-
-        /* 水準器オーバーレイ */
+        
+        /* 水準器 */
         .level-overlay {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 200px;
-            height: 200px;
+            width: 200px; height: 200px;
             border-radius: 50%;
             border: 2px dashed rgba(255, 255, 255, 0.5);
             z-index: 10;
-            pointer-events: none; /* タッチ操作を透過 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            pointer-events: none;
+            display: flex; justify-content: center; align-items: center;
         }
-        
-        /* 十字キー */
-        .crosshair {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-        }
+        .crosshair { position: absolute; width: 100%; height: 100%; }
         .crosshair::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.5); }
         .crosshair::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.5); }
-
-        /* 中央のターゲット円（OK判定エリア） */
+        
         .target-circle {
-            width: 60px; /* さらに大きくしました */
-            height: 60px;
+            width: 60px; height: 60px;
             border: 3px solid rgba(255, 255, 255, 0.8);
             border-radius: 50%;
             z-index: 11;
             transition: all 0.2s;
         }
-        /* OK時のスタイル */
         .target-circle.ok {
-            border-color: #2ecc71; /* 緑色 */
+            border-color: #2ecc71;
             background-color: rgba(46, 204, 113, 0.3);
             box-shadow: 0 0 15px #2ecc71;
         }
-
-        /* 赤い玉（気泡） */
         .bubble {
             position: absolute;
-            width: 30px;
-            height: 30px;
-            background-color: #e74c3c; /* 赤色 */
+            width: 30px; height: 30px;
+            background-color: #e74c3c;
             border-radius: 50%;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             z-index: 12;
-            transition: transform 0.1s linear; /* キビキビ動く */
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            transition: transform 0.1s linear;
         }
 
-        /* センサー許可ボタン */
         .sensor-btn {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             z-index: 20;
-            background: rgba(0, 0, 0, 0.6);
-            color: #fff;
-            border: 1px solid #fff;
-            padding: 8px 16px;
-            border-radius: 20px;
-            display: none;
+            background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid #fff;
+            padding: 8px 16px; border-radius: 20px; display: none;
         }
 
-        /* シャッターボタンエリア */
+        /* シャッターエリア */
         .controls-area {
             height: 120px;
             background: #222;
@@ -120,29 +141,31 @@
             justify-content: center;
             align-items: center;
             z-index: 20;
+            display: none; /* 初期は非表示 */
         }
         .shutter-btn {
-            width: 70px;
-            height: 70px;
-            background-color: #fff;
-            border-radius: 50%;
-            border: 5px solid #ccc;
-            cursor: pointer;
-            transition: transform 0.1s;
+            width: 70px; height: 70px;
+            background-color: #fff; border-radius: 50%; border: 5px solid #ccc;
+            cursor: pointer; transition: transform 0.1s;
         }
-        .shutter-btn:active {
-            transform: scale(0.95);
-            background-color: #ddd;
+        .shutter-btn:active { transform: scale(0.95); background-color: #ddd; }
+        
+        /* 戻るボタン（カメラモード時） */
+        .back-btn {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            color: white; font-size: 0.9rem; text-decoration: underline; cursor: pointer;
         }
 
-        /* --- 結果画面（撮影後に表示） --- */
+
+        /* --- 結果＆編集画面 --- */
         #resultLayer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             background: #f0f4f8;
             color: #333;
             z-index: 50;
-            display: none; /* 初期は非表示 */
+            display: none;
             flex-direction: column;
             overflow-y: auto;
             padding-bottom: 30px;
@@ -151,173 +174,234 @@
             padding: 15px;
             background: #fff;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
         }
-        .retake-btn {
-            background: #95a5a6;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            font-weight: bold;
+        .home-btn {
+            background: #95a5a6; color: white; border: none;
+            padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer;
         }
-        .result-content {
-            padding: 20px;
-            text-align: center;
-        }
-        .result-canvas {
-            max-width: 100%;
-            border: 1px solid #ccc;
-            margin-bottom: 20px;
-        }
+        .result-content { padding: 20px; text-align: center; }
+        .result-canvas { max-width: 100%; border: 1px solid #ccc; margin-bottom: 20px; }
         
-        /* スライダーと数値 */
-        .slider-box {
-            background: #fff;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 10px;
-        }
+        .slider-box { background: #fff; padding: 15px; border-radius: 10px; margin-top: 10px; }
         input[type=range] { width: 100%; margin: 15px 0; }
-
-        .score-box {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 10px;
-        }
+        .score-box { display: flex; justify-content: space-around; margin-top: 10px; }
         .main-score { font-size: 2rem; color: #27ae60; font-weight: bold; }
         .sub-score { font-size: 1rem; color: #7f8c8d; }
 
+        /* ファイル選択用（隠し要素） */
+        #fileInput { display: none; }
     </style>
 </head>
 <body>
 
-<div class="camera-container">
-    <video id="video" autoplay playsinline muted></video>
-    
-    <button id="sensorBtn" class="sensor-btn" onclick="requestSensorPermission()">📡 水準器ON</button>
-
-    <div class="level-overlay">
-        <div class="crosshair"></div>
-        <div class="target-circle" id="targetCircle"></div>
-        <div class="bubble" id="bubble"></div>
-    </div>
-</div>
-
-<div class="controls-area">
-    <button class="shutter-btn" id="shutterBtn"></button>
-</div>
-
-<div id="resultLayer">
-    <div class="result-header">
-        <h2 style="margin:0; font-size:1.2rem;">🌲 AI林冠アプリ ｖ1.2</h2>
-        <button class="retake-btn" onclick="resetCamera()">📷 再撮影</button>
-    </div>
-    
-    <div class="result-content">
-        <canvas id="canvas" class="result-canvas"></canvas>
+    <div id="startScreen">
+        <div class="app-title">🌲 AI林冠 v2.0</div>
         
-        <div class="slider-box">
-            <label>空の明るさ調整</label>
-            <input type="range" id="thresholdSlider" min="0" max="255" value="180">
-            
-            <div class="score-box">
-                <div>
-                    <div>林冠被覆率</div>
-                    <div class="main-score" id="treeRatio">-%</div>
-                </div>
-                <div>
-                    <div>空隙率</div>
-                    <div class="sub-score" id="skyRatio">-%</div>
-                </div>
-            </div>
-            <p style="font-size:0.8rem; color:red; margin-top:10px;">※赤い部分を「空」とみなしています</p>
+        <button class="mode-btn btn-camera" onclick="startCameraMode()">
+            <span>📷</span> カメラで撮影
+        </button>
+        
+        <button class="mode-btn btn-file" onclick="startFileMode()">
+            <span>📂</span> 写真を選択
+        </button>
+        
+        <div style="margin-top:20px; font-size:0.8rem; color:#7f8c8d;">
+            ※PCや既存画像は「写真を選択」へ
         </div>
     </div>
-</div>
+    
+    <input type="file" id="fileInput" accept="image/*">
+
+
+    <div class="camera-container" id="cameraContainer">
+        <video id="video" autoplay playsinline muted></video>
+        
+        <button id="sensorBtn" class="sensor-btn" onclick="requestSensorPermission()">📡 水準器ON</button>
+
+        <div class="level-overlay">
+            <div class="crosshair"></div>
+            <div class="target-circle" id="targetCircle"></div>
+            <div class="bubble" id="bubble"></div>
+        </div>
+    </div>
+
+    <div class="controls-area" id="controlsArea">
+        <div class="back-btn" onclick="goHome()">🏠 戻る</div>
+        <button class="shutter-btn" id="shutterBtn"></button>
+    </div>
+
+
+    <div id="resultLayer">
+        <div class="result-header">
+            <h2 style="margin:0; font-size:1.2rem;">🌲 解析結果</h2>
+            <button class="home-btn" onclick="goHome()">🏠 最初に戻る</button>
+        </div>
+        
+        <div class="result-content">
+            <canvas id="canvas" class="result-canvas"></canvas>
+            
+            <div class="slider-box">
+                <label>空の明るさ調整</label>
+                <input type="range" id="thresholdSlider" min="0" max="255" value="180">
+                
+                <div class="score-box">
+                    <div>
+                        <div>林冠被覆率</div>
+                        <div class="main-score" id="treeRatio">-%</div>
+                    </div>
+                    <div>
+                        <div>空隙率</div>
+                        <div class="sub-score" id="skyRatio">-%</div>
+                    </div>
+                </div>
+                <p style="font-size:0.8rem; color:red; margin-top:10px;">※赤い部分を「空」とみなしています</p>
+            </div>
+        </div>
+    </div>
+
 
 <script>
-    // --- サービスワーカー ---
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js');
     }
 
-    // --- 変数 ---
+    // --- UI要素 ---
+    const startScreen = document.getElementById('startScreen');
+    const cameraContainer = document.getElementById('cameraContainer');
+    const controlsArea = document.getElementById('controlsArea');
+    const resultLayer = document.getElementById('resultLayer');
+    const fileInput = document.getElementById('fileInput');
+
     const video = document.getElementById('video');
     const bubble = document.getElementById('bubble');
     const targetCircle = document.getElementById('targetCircle');
     const sensorBtn = document.getElementById('sensorBtn');
     const shutterBtn = document.getElementById('shutterBtn');
-    
-    const resultLayer = document.getElementById('resultLayer');
+
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const slider = document.getElementById('thresholdSlider');
     const treeRatioDisplay = document.getElementById('treeRatio');
     const skyRatioDisplay = document.getElementById('skyRatio');
 
-    let originalImageData = null; // 解析用データ
+    let originalImageData = null;
     let currentStream = null;
+    let isCameraRunning = false;
 
-    // --- 1. カメラ起動 (WebRTC) ---
-    async function startCamera() {
+    // --- モード切替 ---
+
+    // 1. カメラモード開始
+    async function startCameraMode() {
+        startScreen.style.display = 'none';
+        cameraContainer.style.display = 'flex';
+        controlsArea.style.display = 'flex';
+        
         try {
             const constraints = {
-                video: {
-                    facingMode: 'environment', // 外カメラ
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                },
+                video: { facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080} },
                 audio: false
             };
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = currentStream;
+            isCameraRunning = true;
+            
+            // センサー初期化（iOS用ボタン表示判定）
+            checkSensorPermission();
         } catch (err) {
-            console.error("Camera Error:", err);
-            alert("カメラを起動できませんでした。権限を確認してください。");
+            alert("カメラを起動できませんでした");
+            goHome();
         }
     }
 
-    // 起動時にカメラON
-    startCamera();
+    // 2. ファイルモード開始
+    function startFileMode() {
+        fileInput.click();
+    }
 
-    // --- 2. 水準器ロジック (iOS対応) ---
+    // ファイル選択時の処理
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                startScreen.style.display = 'none';
+                showResult(img);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // 3. ホームに戻る（リセット）
+    function goHome() {
+        // カメラ停止
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        isCameraRunning = false;
+
+        // UIリセット
+        cameraContainer.style.display = 'none';
+        controlsArea.style.display = 'none';
+        resultLayer.style.display = 'none';
+        startScreen.style.display = 'flex';
+        
+        // ファイル入力リセット
+        fileInput.value = '';
+    }
+
+
+    // --- 水準器ロジック（修正版） ---
     
-    // iOSはボタンで許可が必要
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        sensorBtn.style.display = 'block';
-    } else {
-        window.addEventListener('deviceorientation', handleOrientation);
+    function checkSensorPermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            sensorBtn.style.display = 'block';
+        } else {
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
     }
 
     function requestSensorPermission() {
-        DeviceOrientationEvent.requestPermission()
-            .then(response => {
-                if (response === 'granted') {
-                    sensorBtn.style.display = 'none';
-                    window.addEventListener('deviceorientation', handleOrientation);
-                } else {
-                    alert('センサー許可が必要です');
-                }
-            })
-            .catch(console.error);
+        DeviceOrientationEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+                sensorBtn.style.display = 'none';
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+        });
     }
 
     function handleOrientation(event) {
+        if (!isCameraRunning) return;
+
         let x = event.gamma; // 左右
-        let y = event.beta;  // 前後
+        let y = event.beta;  // 前後（これが重要！）
 
-        // 90度以上傾いたら制限
-        if (x > 90) x = 90; if (x < -90) x = -90;
-        if (y > 90) y = 90; if (y < -90) y = -90;
+        // ■■■ ここが修正ポイント ■■■
+        // Beta（前後傾き）は、画面が上だと0、画面が下（空撮り）だと±180になります。
+        // どちらも「水平」として扱いたいので、計算を調整します。
 
-        // 赤玉の移動量 (感度調整: 1度あたり1.5px)
+        // 画面が下を向いている時 (Betaが90以上 または -90以下)
+        if (Math.abs(y) > 90) {
+            // 180度からの差分に変換（例: 170度 -> 10度）
+            if (y > 0) {
+                y = 180 - y;
+            } else {
+                y = -180 - y;
+            }
+            // 左右の動きも反転する場合があるので補正（簡易的にそのまま）
+        }
+
+        // これで y は「水平からのズレ（度数）」になります
+        
+        // 移動量の計算
         let moveX = x * 1.5;
         let moveY = y * 1.5;
 
-        // 円の外に出ないように制限 (半径80px以内)
         const maxDist = 80;
         const dist = Math.sqrt(moveX*moveX + moveY*moveY);
         if (dist > maxDist) {
@@ -327,57 +411,63 @@
 
         bubble.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
 
-        // ★判定ライン：±10度まで緩和（これなら入るはず！）
+        // 判定（±10度以内）
         const threshold = 10;
         if (Math.abs(x) < threshold && Math.abs(y) < threshold) {
-            targetCircle.classList.add('ok'); // 緑色に光る
+            targetCircle.classList.add('ok');
         } else {
             targetCircle.classList.remove('ok');
         }
     }
 
 
-    // --- 3. 撮影＆解析ロジック ---
+    // --- 解析ロジック ---
 
+    // シャッターボタン
     shutterBtn.addEventListener('click', () => {
-        // ビデオの現在のフレームをキャンバスに描画
-        const width = video.videoWidth;
-        const height = video.videoHeight;
+        // ビデオ映像をキャプチャして結果表示へ
+        const w = video.videoWidth;
+        const h = video.videoHeight;
         
-        // 縦横比を維持して少し小さくリサイズ（処理軽減）
+        // 作業用キャンバスで画像化
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0, w, h);
+        
+        // Imageオブジェクト化して共通処理へ
+        const img = new Image();
+        img.onload = () => showResult(img);
+        img.src = tempCanvas.toDataURL('image/jpeg');
+    });
+
+    // 解析と表示（共通関数）
+    function showResult(img) {
+        resultLayer.style.display = 'flex';
+        
+        // リサイズ計算
         const MAX_SIZE = 800;
-        let drawW = width;
-        let drawH = height;
-        if (width > height) {
-            if (width > MAX_SIZE) { drawH = height * (MAX_SIZE/width); drawW = MAX_SIZE; }
+        let drawW = img.width;
+        let drawH = img.height;
+        if (drawW > drawH) {
+            if (drawW > MAX_SIZE) { drawH = drawH * (MAX_SIZE/drawW); drawW = MAX_SIZE; }
         } else {
-            if (height > MAX_SIZE) { drawW = width * (MAX_SIZE/height); drawH = MAX_SIZE; }
+            if (drawH > MAX_SIZE) { drawW = drawW * (MAX_SIZE/drawH); drawH = MAX_SIZE; }
         }
 
         canvas.width = drawW;
         canvas.height = drawH;
-        ctx.drawImage(video, 0, 0, drawW, drawH);
-
-        // 解析用データを保存
-        originalImageData = ctx.getImageData(0, 0, drawW, drawH);
-
-        // 結果画面を表示
-        resultLayer.style.display = 'flex';
+        ctx.drawImage(img, 0, 0, drawW, drawH);
         
-        // 初回計算実行
+        originalImageData = ctx.getImageData(0, 0, drawW, drawH);
+        
+        // 初期計算
         processImage();
-    });
-
-    // 再撮影ボタン
-    function resetCamera() {
-        resultLayer.style.display = 'none';
-        // カメラは裏で動いているのでそのまま
     }
 
-    // スライダー操作
     slider.addEventListener('input', processImage);
 
-    // 解析処理（コピペ＆リファクタリング）
     function processImage() {
         if (!originalImageData) return;
 
@@ -397,15 +487,12 @@
             const g = src[i+1];
             const b = src[i+2];
             
-            // 輝度計算
             const lum = 0.299*r + 0.587*g + 0.114*b;
 
             if (lum > threshold) {
-                // 空判定 -> 赤く塗る
                 skyCount++;
                 dst[i] = 255; dst[i+1] = 0; dst[i+2] = 0; dst[i+3] = 255;
             } else {
-                // 木判定 -> そのまま
                 dst[i] = r; dst[i+1] = g; dst[i+2] = b; dst[i+3] = 255;
             }
         }
