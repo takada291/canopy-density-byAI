@@ -2,240 +2,292 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI林冠</title>
     
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <meta name="theme-color" content="#f0f4f8">
+    <meta name="theme-color" content="#2c3e50">
 
     <style>
         body {
             font-family: sans-serif;
             margin: 0;
-            padding: 20px;
-            background-color: #f0f4f8;
-            color: #333;
-            text-align: center;
-            overscroll-behavior-y: none; 
-        }
-        h1 {
-            font-size: 1.2rem;
-            color: #2c3e50;
-            margin-bottom: 15px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 0;
+            background-color: #000; /* カメラ画面っぽく黒背景 */
+            color: #fff;
+            overflow: hidden; /* スクロール禁止 */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* --- 水準器エリアのデザイン（改良版） --- */
-        .level-area {
+        /* --- メイン画面（カメラ＆水準器） --- */
+        .camera-container {
             position: relative;
-            width: 150px;
-            height: 150px;
-            margin: 0 auto 20px auto;
-            background-color: #eef;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* カメラ映像（ビデオ） */
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 画面いっぱいに表示 */
+            z-index: 1;
+        }
+
+        /* 水準器オーバーレイ */
+        .level-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
             border-radius: 50%;
-            border: 4px solid #bdc3c7;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            z-index: 10;
+            pointer-events: none; /* タッチ操作を透過 */
             display: flex;
             justify-content: center;
             align-items: center;
         }
+        
+        /* 十字キー */
         .crosshair {
             position: absolute;
             width: 100%;
             height: 100%;
         }
-        .crosshair::before, .crosshair::after {
-            content: '';
-            position: absolute;
-            background-color: #bdc3c7;
-        }
-        .crosshair::before { top: 50%; left: 10px; right: 10px; height: 1px; }
-        .crosshair::after { left: 50%; top: 10px; bottom: 10px; width: 1px; }
-        
-        /* ターゲット枠を大きくしました（20px→40px） */
-        .center-circle {
-            position: absolute;
-            width: 40px; 
-            height: 40px;
-            border: 2px solid #27ae60;
+        .crosshair::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.5); }
+        .crosshair::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.5); }
+
+        /* 中央のターゲット円（OK判定エリア） */
+        .target-circle {
+            width: 60px; /* さらに大きくしました */
+            height: 60px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
             border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 1;
-            /* ターゲット自体の見た目も少し透過させて見やすく */
-            background-color: rgba(39, 174, 96, 0.1);
+            z-index: 11;
+            transition: all 0.2s;
         }
-        
+        /* OK時のスタイル */
+        .target-circle.ok {
+            border-color: #2ecc71; /* 緑色 */
+            background-color: rgba(46, 204, 113, 0.3);
+            box-shadow: 0 0 15px #2ecc71;
+        }
+
+        /* 赤い玉（気泡） */
         .bubble {
             position: absolute;
-            width: 24px;
-            height: 24px;
-            background-color: #e74c3c;
+            width: 30px;
+            height: 30px;
+            background-color: #e74c3c; /* 赤色 */
             border-radius: 50%;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            transition: transform 0.1s ease-out;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            z-index: 2;
-            opacity: 0.8;
-        }
-        
-        .level-area.perfect {
-            border-color: #27ae60;
-            background-color: #d5f5e3; /* OK時の背景色を少し濃くして分かりやすく */
-        }
-        .level-msg {
-            font-size: 0.9rem;
-            height: 1.2em;
-            margin-bottom: 10px;
-            font-weight: bold;
-            color: #7f8c8d;
+            z-index: 12;
+            transition: transform 0.1s linear; /* キビキビ動く */
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
 
+        /* センサー許可ボタン */
         .sensor-btn {
-            background-color: #3498db;
-            color: white;
-            border: none;
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            border: 1px solid #fff;
             padding: 8px 16px;
             border-radius: 20px;
-            font-size: 0.9rem;
-            margin-bottom: 15px;
-            cursor: pointer;
             display: none;
         }
 
-        .upload-btn-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
+        /* シャッターボタンエリア */
+        .controls-area {
+            height: 120px;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+        .shutter-btn {
+            width: 70px;
+            height: 70px;
+            background-color: #fff;
+            border-radius: 50%;
+            border: 5px solid #ccc;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .shutter-btn:active {
+            transform: scale(0.95);
+            background-color: #ddd;
+        }
+
+        /* --- 結果画面（撮影後に表示） --- */
+        #resultLayer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #f0f4f8;
+            color: #333;
+            z-index: 50;
+            display: none; /* 初期は非表示 */
+            flex-direction: column;
+            overflow-y: auto;
+            padding-bottom: 30px;
+        }
+        .result-header {
+            padding: 15px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .retake-btn {
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .result-content {
+            padding: 20px;
+            text-align: center;
+        }
+        .result-canvas {
+            max-width: 100%;
+            border: 1px solid #ccc;
             margin-bottom: 20px;
         }
-        .btn {
-            border: 2px solid #7f8c8d;
-            color: #555;
-            background-color: white;
-            padding: 10px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .upload-btn-wrapper input[type=file] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-        }
         
-        canvas {
-            max-width: 100%;
-            height: auto;
-            border: 1px solid #ccc;
-            margin-bottom: 15px;
-            display: none;
-        }
-
-        .controls {
-            margin: 20px 0;
+        /* スライダーと数値 */
+        .slider-box {
+            background: #fff;
             padding: 15px;
-            background-color: #eef;
-            border-radius: 8px;
-            display: none;
+            border-radius: 10px;
+            margin-top: 10px;
         }
-        input[type=range] {
-            width: 100%;
-            margin: 10px 0;
-        }
-        
-        .result-box {
+        input[type=range] { width: 100%; margin: 15px 0; }
+
+        .score-box {
             display: flex;
             justify-content: space-around;
-            margin-top: 15px;
-            font-weight: bold;
+            margin-top: 10px;
         }
-        .score { font-size: 1.5rem; color: #27ae60; }
+        .main-score { font-size: 2rem; color: #27ae60; font-weight: bold; }
         .sub-score { font-size: 1rem; color: #7f8c8d; }
-        .legend { font-size: 0.8rem; color: #e74c3c; margin-top: 5px; }
+
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🌲 AI林冠 v1.1</h1>
+<div class="camera-container">
+    <video id="video" autoplay playsinline muted></video>
+    
+    <button id="sensorBtn" class="sensor-btn" onclick="requestSensorPermission()">📡 水準器ON</button>
 
-    <button id="sensorBtn" class="sensor-btn" onclick="requestSensorPermission()">📡 水準器を有効にする</button>
-
-    <div class="level-msg" id="levelMsg">スマホを水平にしてください</div>
-
-    <div class="level-area" id="levelArea">
+    <div class="level-overlay">
         <div class="crosshair"></div>
-        <div class="center-circle"></div>
+        <div class="target-circle" id="targetCircle"></div>
         <div class="bubble" id="bubble"></div>
     </div>
+</div>
 
-    <div class="upload-btn-wrapper">
-        <button class="btn">
-            <span>📷</span> 写真を撮影・解析
-        </button>
-        <input type="file" id="fileInput" accept="image/*" capture="environment">
+<div class="controls-area">
+    <button class="shutter-btn" id="shutterBtn"></button>
+</div>
+
+<div id="resultLayer">
+    <div class="result-header">
+        <h2 style="margin:0; font-size:1.2rem;">🌲 AI林冠アプリ ｖ1.2</h2>
+        <button class="retake-btn" onclick="resetCamera()">📷 再撮影</button>
     </div>
-
-    <canvas id="canvas"></canvas>
-
-    <div class="controls" id="controlPanel">
-        <label>判定の調整（空の明るさ）</label>
-        <input type="range" id="thresholdSlider" min="0" max="255" value="180">
-        <div class="legend">※赤色の部分を「空」として計算しています</div>
+    
+    <div class="result-content">
+        <canvas id="canvas" class="result-canvas"></canvas>
         
-        <div class="result-box">
-            <div>
-                <div>林冠被覆率</div>
-                <div class="score" id="treeRatio">-</div>
+        <div class="slider-box">
+            <label>空の明るさ調整</label>
+            <input type="range" id="thresholdSlider" min="0" max="255" value="180">
+            
+            <div class="score-box">
+                <div>
+                    <div>林冠被覆率</div>
+                    <div class="main-score" id="treeRatio">-%</div>
+                </div>
+                <div>
+                    <div>空隙率</div>
+                    <div class="sub-score" id="skyRatio">-%</div>
+                </div>
             </div>
-            <div>
-                <div>空隙率（空）</div>
-                <div class="sub-score" id="skyRatio">-</div>
-            </div>
+            <p style="font-size:0.8rem; color:red; margin-top:10px;">※赤い部分を「空」とみなしています</p>
         </div>
     </div>
 </div>
 
 <script>
+    // --- サービスワーカー ---
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-            navigator.serviceWorker.register('sw.js').then(function(registration) {
-                console.log('SW registered');
-            }, function(err) {
-                console.log('SW failed: ', err);
-            });
-        });
+        navigator.serviceWorker.register('sw.js');
     }
 
+    // --- 変数 ---
+    const video = document.getElementById('video');
     const bubble = document.getElementById('bubble');
-    const levelArea = document.getElementById('levelArea');
-    const levelMsg = document.getElementById('levelMsg');
+    const targetCircle = document.getElementById('targetCircle');
     const sensorBtn = document.getElementById('sensorBtn');
+    const shutterBtn = document.getElementById('shutterBtn');
     
-    // --- 1. 水準器機能（調整版） ---
+    const resultLayer = document.getElementById('resultLayer');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('thresholdSlider');
+    const treeRatioDisplay = document.getElementById('treeRatio');
+    const skyRatioDisplay = document.getElementById('skyRatio');
+
+    let originalImageData = null; // 解析用データ
+    let currentStream = null;
+
+    // --- 1. カメラ起動 (WebRTC) ---
+    async function startCamera() {
+        try {
+            const constraints = {
+                video: {
+                    facingMode: 'environment', // 外カメラ
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
+                audio: false
+            };
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
+        } catch (err) {
+            console.error("Camera Error:", err);
+            alert("カメラを起動できませんでした。権限を確認してください。");
+        }
+    }
+
+    // 起動時にカメラON
+    startCamera();
+
+    // --- 2. 水準器ロジック (iOS対応) ---
     
+    // iOSはボタンで許可が必要
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        sensorBtn.style.display = 'inline-block';
-        levelMsg.textContent = 'ボタンを押してセンサーを有効化';
+        sensorBtn.style.display = 'block';
     } else {
         window.addEventListener('deviceorientation', handleOrientation);
     }
@@ -246,29 +298,27 @@
                 if (response === 'granted') {
                     sensorBtn.style.display = 'none';
                     window.addEventListener('deviceorientation', handleOrientation);
-                    levelMsg.textContent = 'スマホを水平にしてください';
                 } else {
-                    alert('センサーの使用が拒否されました。設定を確認してください。');
+                    alert('センサー許可が必要です');
                 }
             })
             .catch(console.error);
     }
 
     function handleOrientation(event) {
-        let x = event.gamma; 
-        let y = event.beta;  
+        let x = event.gamma; // 左右
+        let y = event.beta;  // 前後
 
-        if (x > 90) x = 90;
-        if (x < -90) x = -90;
-        if (y > 90) y = 90;
-        if (y < -90) y = -90;
+        // 90度以上傾いたら制限
+        if (x > 90) x = 90; if (x < -90) x = -90;
+        if (y > 90) y = 90; if (y < -90) y = -90;
 
-        const maxDist = 60; 
-
-        // 感度を少しマイルドに（x2 -> x1.5）してブレを軽減
+        // 赤玉の移動量 (感度調整: 1度あたり1.5px)
         let moveX = x * 1.5;
         let moveY = y * 1.5;
 
+        // 円の外に出ないように制限 (半径80px以内)
+        const maxDist = 80;
         const dist = Math.sqrt(moveX*moveX + moveY*moveY);
         if (dist > maxDist) {
             moveX = (moveX / dist) * maxDist;
@@ -277,107 +327,96 @@
 
         bubble.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
 
-        // ★★★ ここを変更しました ★★★
-        // 判定を ±3度 から ±7度 に緩和しました
-        const threshold = 7;
-
+        // ★判定ライン：±10度まで緩和（これなら入るはず！）
+        const threshold = 10;
         if (Math.abs(x) < threshold && Math.abs(y) < threshold) {
-            levelArea.classList.add('perfect');
-            levelMsg.textContent = 'OK！ 真上を向いています';
-            levelMsg.style.color = '#27ae60';
+            targetCircle.classList.add('ok'); // 緑色に光る
         } else {
-            levelArea.classList.remove('perfect');
-            levelMsg.textContent = '水平に合わせてください';
-            levelMsg.style.color = '#7f8c8d';
+            targetCircle.classList.remove('ok');
         }
     }
 
 
-    // --- 2. 画像処理機能 ---
+    // --- 3. 撮影＆解析ロジック ---
 
-    const fileInput = document.getElementById('fileInput');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const slider = document.getElementById('thresholdSlider');
-    const controlPanel = document.getElementById('controlPanel');
-    const treeRatioDisplay = document.getElementById('treeRatio');
-    const skyRatioDisplay = document.getElementById('skyRatio');
+    shutterBtn.addEventListener('click', () => {
+        // ビデオの現在のフレームをキャンバスに描画
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        
+        // 縦横比を維持して少し小さくリサイズ（処理軽減）
+        const MAX_SIZE = 800;
+        let drawW = width;
+        let drawH = height;
+        if (width > height) {
+            if (width > MAX_SIZE) { drawH = height * (MAX_SIZE/width); drawW = MAX_SIZE; }
+        } else {
+            if (height > MAX_SIZE) { drawW = width * (MAX_SIZE/height); drawH = MAX_SIZE; }
+        }
 
-    let originalImageData = null;
-    const MAX_WIDTH = 800;
+        canvas.width = drawW;
+        canvas.height = drawH;
+        ctx.drawImage(video, 0, 0, drawW, drawH);
 
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        // 解析用データを保存
+        originalImageData = ctx.getImageData(0, 0, drawW, drawH);
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.onload = () => {
-                let width = img.width;
-                let height = img.height;
-
-                if (width > MAX_WIDTH) {
-                    height = height * (MAX_WIDTH / width);
-                    width = MAX_WIDTH;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.style.display = 'block';
-
-                originalImageData = ctx.getImageData(0, 0, width, height);
-                controlPanel.style.display = 'block';
-                controlPanel.scrollIntoView({behavior: "smooth"});
-                
-                processImage();
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+        // 結果画面を表示
+        resultLayer.style.display = 'flex';
+        
+        // 初回計算実行
+        processImage();
     });
 
+    // 再撮影ボタン
+    function resetCamera() {
+        resultLayer.style.display = 'none';
+        // カメラは裏で動いているのでそのまま
+    }
+
+    // スライダー操作
     slider.addEventListener('input', processImage);
 
+    // 解析処理（コピペ＆リファクタリング）
     function processImage() {
         if (!originalImageData) return;
 
         const threshold = parseInt(slider.value);
-        const width = canvas.width;
-        const height = canvas.height;
+        const w = canvas.width;
+        const h = canvas.height;
         
-        const displayData = ctx.createImageData(width, height);
         const src = originalImageData.data;
-        const dst = displayData.data;
+        const output = ctx.createImageData(w, h);
+        const dst = output.data;
 
-        let skyPixels = 0;
-        let totalPixels = width * height;
+        let skyCount = 0;
+        const totalPixels = w * h;
 
         for (let i = 0; i < src.length; i += 4) {
             const r = src[i];
-            const g = src[i + 1];
-            const b = src[i + 2];
+            const g = src[i+1];
+            const b = src[i+2];
             
-            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            // 輝度計算
+            const lum = 0.299*r + 0.587*g + 0.114*b;
 
-            if (luminance > threshold) {
-                skyPixels++;
+            if (lum > threshold) {
+                // 空判定 -> 赤く塗る
+                skyCount++;
                 dst[i] = 255; dst[i+1] = 0; dst[i+2] = 0; dst[i+3] = 255;
             } else {
+                // 木判定 -> そのまま
                 dst[i] = r; dst[i+1] = g; dst[i+2] = b; dst[i+3] = 255;
             }
         }
+        
+        ctx.putImageData(output, 0, 0);
 
-        ctx.putImageData(displayData, 0, 0);
-
-        const skyRatio = (skyPixels / totalPixels) * 100;
-        const treeRatio = 100 - skyRatio;
-
-        treeRatioDisplay.textContent = treeRatio.toFixed(1) + '%';
-        skyRatioDisplay.textContent = skyRatio.toFixed(1) + '%';
+        const skyRate = (skyCount / totalPixels) * 100;
+        treeRatioDisplay.textContent = (100 - skyRate).toFixed(1) + '%';
+        skyRatioDisplay.textContent = skyRate.toFixed(1) + '%';
     }
-</script>
 
+</script>
 </body>
 </html>
