@@ -189,6 +189,40 @@
         .main-score { font-size: 2rem; color: #27ae60; font-weight: bold; }
         .sub-score { font-size: 1rem; color: #7f8c8d; }
 
+        /* ▼▼▼ 追加: GPSボタン用スタイル ▼▼▼ */
+        .gps-section {
+            margin-top: 20px;
+            border-top: 1px dashed #ccc;
+            padding-top: 15px;
+        }
+        .gps-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .gps-btn:active { transform: scale(0.98); }
+        .gps-result {
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 1rem;
+            color: #2c3e50;
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            display: none; /* 初期は非表示 */
+        }
+        /* ▲▲▲ 追加終わり ▲▲▲ */
+
         /* ファイル選択用（隠し要素） */
         #fileInput { display: none; }
     </style>
@@ -196,7 +230,7 @@
 <body>
 
     <div id="startScreen">
-        <div class="app-title">🌲 AI林冠 v2.0</div>
+        <div class="app-title">🌲 AI林冠 v2.1</div>
         
         <button class="mode-btn btn-camera" onclick="startCameraMode()">
             <span>📷</span> カメラで撮影
@@ -256,7 +290,14 @@
                     </div>
                 </div>
                 <p style="font-size:0.8rem; color:red; margin-top:10px;">※赤い部分を「空」とみなしています</p>
-            </div>
+
+                <div class="gps-section">
+                    <button class="gps-btn" onclick="getLocation()">
+                        📍 緯度経度を取得
+                    </button>
+                    <div id="gpsResult" class="gps-result"></div>
+                </div>
+                </div>
         </div>
     </div>
 
@@ -284,6 +325,9 @@
     const slider = document.getElementById('thresholdSlider');
     const treeRatioDisplay = document.getElementById('treeRatio');
     const skyRatioDisplay = document.getElementById('skyRatio');
+
+    // GPS表示用
+    const gpsResult = document.getElementById('gpsResult');
 
     let originalImageData = null;
     let currentStream = null;
@@ -353,6 +397,10 @@
         
         // ファイル入力リセット
         fileInput.value = '';
+        
+        // GPS表示リセット
+        gpsResult.style.display = 'none';
+        gpsResult.textContent = '';
     }
 
 
@@ -381,10 +429,6 @@
         let x = event.gamma; // 左右
         let y = event.beta;  // 前後（これが重要！）
 
-        // ■■■ ここが修正ポイント ■■■
-        // Beta（前後傾き）は、画面が上だと0、画面が下（空撮り）だと±180になります。
-        // どちらも「水平」として扱いたいので、計算を調整します。
-
         // 画面が下を向いている時 (Betaが90以上 または -90以下)
         if (Math.abs(y) > 90) {
             // 180度からの差分に変換（例: 170度 -> 10度）
@@ -393,7 +437,6 @@
             } else {
                 y = -180 - y;
             }
-            // 左右の動きも反転する場合があるので補正（簡易的にそのまま）
         }
 
         // これで y は「水平からのズレ（度数）」になります
@@ -503,6 +546,41 @@
         treeRatioDisplay.textContent = (100 - skyRate).toFixed(1) + '%';
         skyRatioDisplay.textContent = skyRate.toFixed(1) + '%';
     }
+
+    // ▼▼▼ 追加: 緯度経度取得処理 ▼▼▼
+    function getLocation() {
+        gpsResult.style.display = 'block';
+        gpsResult.innerHTML = "📡 取得中...";
+
+        if (!navigator.geolocation) {
+            gpsResult.textContent = "お使いのブラウザでは位置情報が利用できません";
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude.toFixed(6);
+                const lng = position.coords.longitude.toFixed(6);
+                // コピーしやすいように表示
+                gpsResult.innerHTML = `緯度: ${lat}<br>経度: ${lng}`;
+            },
+            (error) => {
+                let errorMsg = "位置情報の取得に失敗しました";
+                switch(error.code) {
+                    case 1: errorMsg = "位置情報の利用が許可されていません"; break;
+                    case 2: errorMsg = "位置情報が利用できません"; break;
+                    case 3: errorMsg = "タイムアウトしました"; break;
+                }
+                gpsResult.textContent = errorMsg;
+            },
+            {
+                enableHighAccuracy: true, // 高精度モード
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }
+    // ▲▲▲ 追加終わり ▲▲▲
 
 </script>
 </body>
