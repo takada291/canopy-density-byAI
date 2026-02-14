@@ -189,7 +189,7 @@
         .main-score { font-size: 2rem; color: #27ae60; font-weight: bold; }
         .sub-score { font-size: 1rem; color: #7f8c8d; }
 
-        /* ▼▼▼ 追加: GPSボタン用スタイル ▼▼▼ */
+        /* GPSボタン用スタイル */
         .gps-section {
             margin-top: 20px;
             border-top: 1px dashed #ccc;
@@ -221,7 +221,6 @@
             border-radius: 5px;
             display: none; /* 初期は非表示 */
         }
-        /* ▲▲▲ 追加終わり ▲▲▲ */
 
         /* ファイル選択用（隠し要素） */
         #fileInput { display: none; }
@@ -230,7 +229,7 @@
 <body>
 
     <div id="startScreen">
-        <div class="app-title">🌲 AI林冠 v2.1</div>
+        <div class="app-title">🌲 AI林冠 v2.2</div>
         
         <button class="mode-btn btn-camera" onclick="startCameraMode()">
             <span>📷</span> カメラで撮影
@@ -297,7 +296,7 @@
                     </button>
                     <div id="gpsResult" class="gps-result"></div>
                 </div>
-                </div>
+            </div>
         </div>
     </div>
 
@@ -342,15 +341,21 @@
         controlsArea.style.display = 'flex';
         
         try {
+            // ★改良点: アスペクト比1（正方形）を優先的に要求
             const constraints = {
-                video: { facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080} },
+                video: {
+                    facingMode: 'environment',
+                    aspectRatio: 1, // 正方形を要求
+                    width: { ideal: 1920 },
+                    height: { ideal: 1920 }
+                },
                 audio: false
             };
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = currentStream;
             isCameraRunning = true;
             
-            // センサー初期化（iOS用ボタン表示判定）
+            // センサー初期化
             checkSensorPermission();
         } catch (err) {
             alert("カメラを起動できませんでした");
@@ -404,7 +409,7 @@
     }
 
 
-    // --- 水準器ロジック（修正版） ---
+    // --- 水準器ロジック ---
     
     function checkSensorPermission() {
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -427,21 +432,12 @@
         if (!isCameraRunning) return;
 
         let x = event.gamma; // 左右
-        let y = event.beta;  // 前後（これが重要！）
+        let y = event.beta;  // 前後
 
-        // 画面が下を向いている時 (Betaが90以上 または -90以下)
         if (Math.abs(y) > 90) {
-            // 180度からの差分に変換（例: 170度 -> 10度）
-            if (y > 0) {
-                y = 180 - y;
-            } else {
-                y = -180 - y;
-            }
+            if (y > 0) { y = 180 - y; } else { y = -180 - y; }
         }
-
-        // これで y は「水平からのズレ（度数）」になります
         
-        // 移動量の計算
         let moveX = x * 1.5;
         let moveY = y * 1.5;
 
@@ -454,7 +450,6 @@
 
         bubble.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
 
-        // 判定（±10度以内）
         const threshold = 10;
         if (Math.abs(x) < threshold && Math.abs(y) < threshold) {
             targetCircle.classList.add('ok');
@@ -468,16 +463,23 @@
 
     // シャッターボタン
     shutterBtn.addEventListener('click', () => {
-        // ビデオ映像をキャプチャして結果表示へ
+        // ★改良点: ビデオ映像を正方形にクロップしてキャプチャ
         const w = video.videoWidth;
         const h = video.videoHeight;
         
-        // 作業用キャンバスで画像化
+        // 短い方の辺に合わせて正方形サイズを決定
+        const size = Math.min(w, h);
+        const startX = (w - size) / 2;
+        const startY = (h - size) / 2;
+        
+        // 作業用キャンバスで画像化（正方形）
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = w;
-        tempCanvas.height = h;
+        tempCanvas.width = size;
+        tempCanvas.height = size;
         const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(video, 0, 0, w, h);
+        
+        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+        tempCtx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
         
         // Imageオブジェクト化して共通処理へ
         const img = new Image();
@@ -547,7 +549,7 @@
         skyRatioDisplay.textContent = skyRate.toFixed(1) + '%';
     }
 
-    // ▼▼▼ 追加: 緯度経度取得処理 ▼▼▼
+    // 緯度経度取得処理
     function getLocation() {
         gpsResult.style.display = 'block';
         gpsResult.innerHTML = "📡 取得中...";
@@ -561,7 +563,6 @@
             (position) => {
                 const lat = position.coords.latitude.toFixed(6);
                 const lng = position.coords.longitude.toFixed(6);
-                // コピーしやすいように表示
                 gpsResult.innerHTML = `緯度: ${lat}<br>経度: ${lng}`;
             },
             (error) => {
@@ -574,13 +575,12 @@
                 gpsResult.textContent = errorMsg;
             },
             {
-                enableHighAccuracy: true, // 高精度モード
+                enableHighAccuracy: true,
                 timeout: 10000,
                 maximumAge: 0
             }
         );
     }
-    // ▲▲▲ 追加終わり ▲▲▲
 
 </script>
 </body>
